@@ -10,16 +10,6 @@ class BedrockService {
 
   Future<String> startMorningConversation() async {
     try {
-      if (kIsWeb) {
-        await Future.delayed(const Duration(seconds: 1));
-        final now = DateTime.now();
-        final hour = now.hour;
-        final minute = now.minute;
-        return 'おはようございます！${hour}時${minute}分ですね。\n\n'
-            '今日は${now.month}月${now.day}日です。API Gateway経由でテスト中です！\n\n'
-            '今日も素敵な一日になりそうですね！';
-      }
-
       final position = await _getCurrentPosition();
 
       print(
@@ -29,9 +19,7 @@ class BedrockService {
       final response = await http
           .post(
             Uri.parse(_voiceApiEndpoint),
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'action': 'start_conversation',
               'latitude': position.latitude,
@@ -53,7 +41,26 @@ class BedrockService {
       );
     } catch (e) {
       print('Error calling API Gateway: $e');
-      return 'おはようございます！今日も素敵な一日になりそうですね。申し訳ございませんが、現在天気情報を取得できません。';
+
+      // Web環境でもフォールバック用の自然な応答を提供
+      final now = DateTime.now();
+      final hour = now.hour;
+      final minute = now.minute;
+
+      String timeGreeting;
+      if (hour < 6) {
+        timeGreeting = 'おはようございます！早起きですね。';
+      } else if (hour < 12) {
+        timeGreeting = 'おはようございます！';
+      } else if (hour < 18) {
+        timeGreeting = 'こんにちは！';
+      } else {
+        timeGreeting = 'こんばんは！';
+      }
+
+      return '$timeGreeting現在${hour}時${minute}分です。\n\n'
+          '今日は${now.month}月${now.day}日ですね。申し訳ございませんが、現在天気情報を取得できません。\n\n'
+          'それでも今日が素敵な一日になりますように！';
     }
   }
 
@@ -66,31 +73,10 @@ class BedrockService {
     try {
       print('Processing voice message via API Gateway: $text');
 
-      if (kIsWeb) {
-        await Future.delayed(const Duration(seconds: 1));
-        
-        String response;
-        if (text.contains('天気') || text.contains('気温')) {
-          response = 'API Gateway経由でテスト中：天気情報を処理しています。実機版では詳細な天気をお伝えできます。';
-        } else if (text.contains('おはよう') || text.contains('挨拶')) {
-          response = 'おはようございます！API Gateway経由でのテストです。実機では音声での自然な会話ができます。';
-        } else {
-          response = 'API Gateway経由でメッセージを受け取りました：「$text」\n実機版では、このメッセージに対してAIが自然に応答します。';
-        }
-
-        return {
-          'message': response,
-          'audio_url': null,
-          'weather': null,
-        };
-      }
-
       final response = await http
           .post(
             Uri.parse(_voiceApiEndpoint),
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'action': 'text_only',
               'text': text,
@@ -116,16 +102,39 @@ class BedrockService {
       }
     } catch (e) {
       print('Error processing voice message via API Gateway: $e');
-      
-      if (kIsWeb) {
-        return {
-          'message': 'API Gateway経由でのテストです。実機版では完全な機能をご利用いただけます。',
-          'audio_url': null,
-          'weather': null,
-        };
+
+      // Web環境でもフォールバック用の自然な応答を提供
+      String fallbackResponse;
+
+      if (text.contains('天気') ||
+          text.contains('気温') ||
+          text.contains('降水') ||
+          text.contains('雨')) {
+        fallbackResponse =
+            '申し訳ございません。現在天気情報を取得できませんが、外出される際は念のため天気予報をご確認くださいね。';
+      } else if (text.contains('おはよう') ||
+          text.contains('朝') ||
+          text.contains('起き')) {
+        final hour = DateTime.now().hour;
+        if (hour < 6) {
+          fallbackResponse = 'おはようございます！とても早起きですね。素晴らしいスタートです！';
+        } else if (hour < 10) {
+          fallbackResponse = 'おはようございます！気持ちの良い朝ですね。今日も良い一日になりそうです！';
+        } else {
+          fallbackResponse = 'おはようございます！今日も元気にスタートしましょう！';
+        }
+      } else if (text.contains('時間') || text.contains('時刻')) {
+        final now = DateTime.now();
+        fallbackResponse = '現在は${now.hour}時${now.minute}分です。';
+      } else if (text.contains('今日') || text.contains('日付')) {
+        final now = DateTime.now();
+        fallbackResponse = '今日は${now.month}月${now.day}日です。';
+      } else {
+        fallbackResponse =
+            'お話しいただき、ありがとうございます。現在システムに接続できませんが、あなたのメッセージは受け取りました。';
       }
-      
-      throw Exception('音声処理エラー: $e');
+
+      return {'message': fallbackResponse, 'audio_url': null, 'weather': null};
     }
   }
 
@@ -135,19 +144,10 @@ class BedrockService {
     double longitude,
   ) async {
     try {
-      if (kIsWeb) {
-        await Future.delayed(const Duration(seconds: 1));
-        return {
-          'weather_info': 'API Gateway経由でのテスト中です。実機版では現在地の詳細な天気情報をお伝えできます。',
-        };
-      }
-
       final response = await http
           .post(
             Uri.parse(_voiceApiEndpoint),
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'action': 'weather_only',
               'latitude': latitude,
@@ -158,15 +158,17 @@ class BedrockService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return {
-          'weather_info': data['weather_info'],
-        };
+        return {'weather_info': data['weather_info']};
       } else {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       print('Error getting weather info via API Gateway: $e');
-      throw Exception('天気情報取得エラー: $e');
+
+      // Web環境でもフォールバック応答を提供
+      return {
+        'weather_info': '申し訳ございません。現在天気情報を取得できません。お出かけの際は、念のため天気予報をご確認ください。',
+      };
     }
   }
 

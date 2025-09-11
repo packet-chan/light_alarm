@@ -39,6 +39,7 @@ dependencies:
   # 音声機能用パッケージ
   speech_to_text: ^7.0.0 # 音声認識（マイク録音）
   audioplayers: ^6.0.0 # 音声再生
+  flutter_tts: ^4.0.2 # テキスト読み上げ機能
   permission_handler: ^11.0.0 # 権限管理（マイク・位置情報）
 
   # The following adds the Cupertino Icons font to your application.

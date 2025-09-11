@@ -10,13 +10,8 @@ import '../services/bedrock_service.dart';
 class VoiceConversationScreen extends StatefulWidget {
   const VoiceConversationScreen({super.key});
 
-  @over                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ), State<VoiceConversationScreen> createState() =>
+  @override
+  State<VoiceConversationScreen> createState() =>
       _VoiceConversationScreenState();
 }
 
@@ -31,14 +26,12 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> {
   bool _isListening = false;
   bool _isPlaying = false;
   bool _speechEnabled = false;
-  Position? _currentPosition;
 
   @override
   void initState() {
     super.initState();
     _initSpeech();
-    _getCurrentLocation();
-    _startConversation();
+    _startMorningConversation();
   }
 
   @override
@@ -47,166 +40,110 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> {
     super.dispose();
   }
 
-  Future<void> _initSpeech() async {
-    // マイク権限の確認・要求
-    final micPermission = await Permission.microphone.request();
-    if (micPermission != PermissionStatus.granted) {
-      print('マイクの権限が拒否されました');
-      return;
-    }
-
-    _speechEnabled = await _speechToText.initialize(
-      onError: (error) => print('音声認識エラー: $error'),
-      onStatus: (status) => print('音声認識ステータス: $status'),
-    );
-
+  // 音声認識初期化
+  void _initSpeech() async {
+    await Permission.microphone.request();
+    _speechEnabled = await _speechToText.initialize();
     setState(() {});
   }
 
-  Future<void> _getCurrentLocation() async {
-    try {
-      _currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-    } catch (e) {
-      print('位置情報取得エラー: $e');
-      // デフォルト位置（東京駅）
-      _currentPosition = Position(
-        latitude: 35.6762,
-        longitude: 139.6503,
-        timestamp: DateTime.now(),
-        accuracy: 0,
-        altitude: 0,
-        heading: 0,
-        speed: 0,
-        speedAccuracy: 0,
-        altitudeAccuracy: 0,
-        headingAccuracy: 0,
-      );
-    }
-  }
-
-  Future<void> _startConversation() async {
-    setState(() {
-      _isLoading = true;
-    });
+  // 朝の挨拶開始
+  Future<void> _startMorningConversation() async {
+    setState(() => _isLoading = true);
 
     try {
-      final response = await _bedrockService.startMorningConversation();
+      final greeting = await _bedrockService.startMorningConversation();
       setState(() {
-        _responseText = response;
+        _responseText = greeting;
         _isLoading = false;
       });
     } catch (e) {
+      print('Error starting conversation: $e');
       setState(() {
-        _responseText = 'エラーが発生しました。もう一度お試しください。';
+        _responseText = 'おはようございます！今日も素敵な一日になりそうですね。';
         _isLoading = false;
       });
     }
   }
 
-  // 音声録音開始
-  Future<void> _startListening() async {
-    if (!_speechEnabled) {
-      await _initSpeech();
-      return;
-    }
+  // 音声認識開始
+  void _startListening() async {
+    if (!_speechEnabled) return;
 
     setState(() {
       _isListening = true;
       _userInput = '';
     });
 
-    await _speechToText.listen(
-      onResult: (result) {
-        setState(() {
-          _userInput = result.recognizedWords;
-        });
-      },
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 5),
-      cancelOnError: true,
-      partialResults: true,
-      localeId: 'ja_JP',
-    );
+    await _speechToText.listen(onResult: _onSpeechResult);
   }
 
-  // 音声録音停止
-  Future<void> _stopListening() async {
+  // 音声認識停止
+  void _stopListening() async {
     await _speechToText.stop();
-    setState(() {
-      _isListening = false;
-    });
+    setState(() => _isListening = false);
 
     if (_userInput.isNotEmpty) {
-      await _processVoiceInput(_userInput);
+      await _processUserInput(_userInput);
     }
   }
 
-  // 音声入力の処理
-  Future<void> _processVoiceInput(String text) async {
-    if (_currentPosition == null) {
-      await _getCurrentLocation();
-    }
-
+  // 音声認識結果処理
+  void _onSpeechResult(result) {
     setState(() {
-      _isLoading = true;
-      _responseText = '処理中...';
+      _userInput = result.recognizedWords;
     });
+  }
+
+  // ユーザー入力処理
+  Future<void> _processUserInput(String input) async {
+    setState(() => _isLoading = true);
 
     try {
+      final position = await Geolocator.getCurrentPosition();
       final result = await _bedrockService.processVoiceMessage(
-        text,
-        _currentPosition!.latitude,
-        _currentPosition!.longitude,
+        input,
+        position.latitude,
+        position.longitude,
       );
 
       setState(() {
-        _responseText = result['message'] ?? 'AI応答を取得できませんでした。';
+        _responseText = result['message'] ?? 'お話しいただき、ありがとうございます。';
         _isLoading = false;
       });
 
-      // 音声URLがある場合は再生
+      // 音声再生（URL が提供された場合）
       if (result['audio_url'] != null) {
-        await _playAudioResponse(result['audio_url']);
+        await _playAudio(result['audio_url']);
       }
     } catch (e) {
+      print('Error processing input: $e');
       setState(() {
-        _responseText = 'エラーが発生しました: $e';
+        _responseText = 'お話しいただき、ありがとうございます。';
         _isLoading = false;
       });
     }
   }
 
-  // 音声レスポンスの再生
-  Future<void> _playAudioResponse(String audioUrl) async {
+  // 音声再生
+  Future<void> _playAudio(String audioUrl) async {
     try {
-      setState(() {
-        _isPlaying = true;
-      });
-
+      setState(() => _isPlaying = true);
       await _audioPlayer.play(UrlSource(audioUrl));
-
-      // 再生完了を監視
+      
       _audioPlayer.onPlayerComplete.listen((_) {
-        setState(() {
-          _isPlaying = false;
-        });
+        setState(() => _isPlaying = false);
       });
     } catch (e) {
-      print('音声再生エラー: $e');
-      setState(() {
-        _isPlaying = false;
-      });
+      print('Error playing audio: $e');
+      setState(() => _isPlaying = false);
     }
   }
 
   // 音声再生停止
   Future<void> _stopAudio() async {
     await _audioPlayer.stop();
-    setState(() {
-      _isPlaying = false;
-    });
+    setState(() => _isPlaying = false);
   }
 
   @override
@@ -233,227 +170,226 @@ class _VoiceConversationScreenState extends State<VoiceConversationScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                // アイコン（状態によって変化）
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: _isListening
-                            ? Colors.red.withOpacity(0.3)
-                            : _isPlaying
-                            ? Colors.green.withOpacity(0.3)
-                            : Colors.blue.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _isListening
-                        ? Icons.mic
-                        : _isPlaying
-                        ? Icons.volume_up
-                        : Icons.wb_sunny,
-                    size: 60,
-                    color: _isListening
-                        ? Colors.red
-                        : _isPlaying
-                        ? Colors.green
-                        : Colors.orange.shade600,
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ユーザー入力表示
-                if (_userInput.isNotEmpty)
-                  Card(
-                    elevation: 4,
-                    color: Colors.blue.shade50,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
+                  // アイコン（状態によって変化）
+                  Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: _isListening
+                              ? Colors.red.withOpacity(0.3)
+                              : _isPlaying
+                              ? Colors.green.withOpacity(0.3)
+                              : Colors.blue.withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Icon(Icons.person, color: Colors.blue.shade600),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              _userInput,
+                    child: Icon(
+                      _isListening
+                          ? Icons.mic
+                          : _isPlaying
+                          ? Icons.volume_up
+                          : Icons.wb_sunny,
+                      size: 60,
+                      color: _isListening
+                          ? Colors.red
+                          : _isPlaying
+                          ? Colors.green
+                          : Colors.orange,
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 30),
+
+                  // 状態表示
+                  Text(
+                    _isListening
+                        ? '音声を聞いています...'
+                        : _isPlaying
+                        ? '音声を再生中...'
+                        : '朝の音声アシスタント',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue.shade800,
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // ユーザー入力表示
+                  if (_userInput.isNotEmpty)
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'あなた:',
                               style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue.shade700,
                                 fontSize: 16,
-                                color: Colors.blue.shade800,
                               ),
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 8),
+                            Text(
+                              _userInput,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
                       ),
+                    ),
+
+                  if (_userInput.isNotEmpty) const SizedBox(height: 20),
+
+                  // AI応答テキスト
+                  Card(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: _isLoading
+                          ? Column(
+                              children: [
+                                CircularProgressIndicator(
+                                  color: Colors.blue.shade600,
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _isListening
+                                      ? '音声を聞いています...'
+                                      : 'AWS Bedrockと通信中...',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'AI アシスタント:',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.green.shade700,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _responseText,
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    height: 1.5,
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
                   ),
 
-                if (_userInput.isNotEmpty) const SizedBox(height: 20),
+                  const SizedBox(height: 30),
 
-                // AI応答テキスト
-                Card(
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                  // 使用方法の説明
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '🎤 マイクボタンを押して音声で話しかけてください\n'
+                      '☀️ 朝の天気や今日の予定について聞いてみましょう\n'
+                      '🔄 再開ボタンで新しい会話を始められます',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: _isLoading
-                        ? Column(
-                            children: [
-                              CircularProgressIndicator(
-                                color: Colors.blue.shade600,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                _isListening
-                                    ? '音声を聞いています...'
-                                    : 'AWS Bedrockと通信中...',
-                                style: TextStyle(
-                                  color: Colors.grey[600],
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          )
-                        : Row(
-                            children: [
-                              Icon(
-                                Icons.smart_toy,
-                                color: Colors.orange.shade600,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  _responseText,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    height: 1.5,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ),
 
-                const SizedBox(height: 40),
+                  const SizedBox(height: 30),
 
-                // 音声録音ボタン
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: _isListening ? Colors.red : Colors.blue.shade600,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color:
-                            (_isListening ? Colors.red : Colors.blue.shade600)
-                                .withOpacity(0.3),
-                        blurRadius: 15,
-                        offset: const Offset(0, 5),
+                  // コントロールボタン
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // マイクボタン
+                      FloatingActionButton(
+                        onPressed: _speechEnabled
+                            ? (_isListening ? _stopListening : _startListening)
+                            : null,
+                        backgroundColor: _isListening
+                            ? Colors.red
+                            : Colors.blue.shade600,
+                        child: Icon(
+                          _isListening ? Icons.mic_off : Icons.mic,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+
+                      // 再開ボタン
+                      FloatingActionButton(
+                        onPressed: _isLoading ? null : _startMorningConversation,
+                        backgroundColor: Colors.orange.shade600,
+                        child: const Icon(
+                          Icons.refresh,
+                          color: Colors.white,
+                          size: 30,
+                        ),
+                      ),
+
+                      // 音声停止ボタン
+                      FloatingActionButton(
+                        onPressed: _isPlaying ? _stopAudio : null,
+                        backgroundColor: _isPlaying
+                            ? Colors.green.shade600
+                            : Colors.grey.shade400,
+                        child: Icon(
+                          _isPlaying ? Icons.stop : Icons.volume_up,
+                          color: Colors.white,
+                          size: 30,
+                        ),
                       ),
                     ],
                   ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(40),
-                      onTap: _speechEnabled
-                          ? (_isListening ? _stopListening : _startListening)
-                          : null,
-                      child: Center(
-                        child: Icon(
-                          _isListening ? Icons.mic_off : Icons.mic,
-                          size: 40,
-                          color: Colors.white,
-                        ),
+
+                  const SizedBox(height: 30),
+
+                  // 戻るボタン
+                  ElevatedButton.icon(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('戻る'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                   ),
-                ),
-
-                const SizedBox(height: 16),
-
-                Text(
-                  _isListening ? 'タップして録音停止' : 'タップして音声入力',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                ),
-
-                const SizedBox(height: 30),
-
-                // ボタン群
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    // 再実行ボタン
-                    ElevatedButton.icon(
-                      onPressed: _isLoading ? null : _startConversation,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('再実行'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-
-                    // 音声停止ボタン
-                    if (_isPlaying)
-                      ElevatedButton.icon(
-                        onPressed: _stopAudio,
-                        icon: const Icon(Icons.stop),
-                        label: const Text('停止'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.orange.shade600,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-
-                    // 戻るボタン
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.pop(context),
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text('戻る'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade600,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
