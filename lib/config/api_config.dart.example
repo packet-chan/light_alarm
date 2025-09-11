@@ -1,0 +1,5 @@
+class ApiConfig {
+  // API Gateway エンドポイント
+  // 実際のエンドポイントに置き換えてください
+  static const String voiceApiEndpoint = 'YOUR_API_GATEWAY_ENDPOINT_HERE';
+}

@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
+import '../config/api_config.dart';
 
 class BedrockService {
-  // API Gateway エンドポイントに変更
-  static const String _voiceApiEndpoint =
-      'https://5t131v2kva.execute-api.ap-northeast-1.amazonaws.com/prod/voice-conversation';
+  // API Gateway エンドポイントを設定ファイルから取得
+  static String get _voiceApiEndpoint => ApiConfig.voiceApiEndpoint;
 
   Future<String> startMorningConversation() async {
     try {

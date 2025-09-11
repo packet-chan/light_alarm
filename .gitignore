@@ -44,6 +44,9 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+# API設定ファイル（機密情報を含むため除外）
+lib/config/api_config.dart
+
 # Documentation and development files
 docs/
 *.md
