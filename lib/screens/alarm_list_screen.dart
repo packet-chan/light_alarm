@@ -183,19 +183,6 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
         context,
         MaterialPageRoute(builder: (context) => const AlarmScreen()),
       );
-
-      // フィードバックを表示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('🌟 隠しコマンドが実行されました！'),
-          backgroundColor: Colors.purple,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-          duration: const Duration(seconds: 2),
-        ),
-      );
     } else {
       // 2秒後にカウントをリセット
       _tapResetTimer = Timer(const Duration(seconds: 2), () {
