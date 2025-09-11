@@ -1,7 +1,26 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-import 'package:light_alarm_prototype/screens/alarm_list_screen.dart'; // 作成したファイルをインポート
+import 'package:light_alarm_prototype/screens/alarm_list_screen.dart';
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:light_alarm_prototype/services/alarm_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  try {
+    // AlarmManagerを初期化
+    final initialized = await AndroidAlarmManager.initialize();
+    await AlarmService.addDebugLog(
+      'AlarmManager初期化: ${initialized ? '成功' : '失敗'}',
+    );
+
+    if (!initialized) {
+      await AlarmService.addDebugLog('⚠️ AlarmManagerの初期化に失敗しました');
+    }
+  } catch (e) {
+    await AlarmService.addDebugLog('AlarmManager初期化エラー: $e');
+  }
+
   runApp(const MyApp());
 }
 
@@ -10,9 +29,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      // アプリの最初の画面を AlarmListScreen に設定
-      home: AlarmListScreen(),
+    return MaterialApp(
+      title: 'Light Alarm',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+      ),
+      home: const AlarmListScreen(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
