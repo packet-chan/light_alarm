@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:light/light.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'package:light_alarm_prototype/screens/conversation_screen.dart';
 
 class AlarmScreen extends StatefulWidget {
   const AlarmScreen({super.key});
@@ -106,7 +107,11 @@ class _AlarmScreenState extends State<AlarmScreen>
     // 3秒後に自動で画面を閉じる
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        Navigator.pop(context);
+        // 現在の画面を置き換える形で遷移する (戻るボタンで戻れないように)
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ConversationScreen()),
+        );
       }
     });
   }
