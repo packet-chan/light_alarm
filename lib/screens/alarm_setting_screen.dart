@@ -3,9 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:light_alarm_prototype/models/alarm_model.dart';
 import 'voice_conversation_screen.dart';
+import 'package:uuid/uuid.dart';
 
 class AlarmSettingScreen extends StatefulWidget {
-  final Alarm? alarm; // 既存のアラームを編集する場合
+  final Alarm? alarm;
 
   const AlarmSettingScreen({super.key, this.alarm});
 
@@ -22,15 +23,12 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
   @override
   void initState() {
     super.initState();
-
     if (widget.alarm != null) {
-      // 編集モード
       _selectedTime = widget.alarm!.time;
       _labelController = TextEditingController(text: widget.alarm!.label);
       _isRepeating = widget.alarm!.isRepeating;
       _selectedWeekdays = List.from(widget.alarm!.weekdays);
     } else {
-      // 新規作成モード
       _selectedTime = TimeOfDay.now();
       _labelController = TextEditingController(text: 'アラーム');
       _isRepeating = false;
@@ -48,19 +46,7 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
     final TimeOfDay? picked = await showTimePicker(
       context: context,
       initialTime: _selectedTime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.blue,
-              brightness: Theme.of(context).brightness,
-            ),
-          ),
-          child: child!,
-        );
-      },
     );
-
     if (picked != null) {
       setState(() {
         _selectedTime = picked;
@@ -68,41 +54,29 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
     }
   }
 
-  Future<void> _saveAlarm() async {
-    if (!_isRepeating || _selectedWeekdays.any((selected) => selected)) {
-      final alarm = Alarm(
-        id:
-            widget.alarm?.id ??
-            DateTime.now().millisecondsSinceEpoch.toString(),
-        time: _selectedTime,
-        label: _labelController.text.trim().isEmpty
-            ? 'アラーム'
-            : _labelController.text.trim(),
-        isRepeating: _isRepeating,
-        weekdays: List.from(_selectedWeekdays),
-        isActive: true,
+  void _saveAlarm() {
+    if (_isRepeating && _selectedWeekdays.every((day) => !day)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('繰り返しアラームの場合は曜日を1つ以上選択してください')),
       );
-
-      Navigator.pop(context, alarm);
-    } else {
-      // 繰り返しが選択されているのに曜日が選択されていない場合
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('繰り返しアラームの場合は曜日を選択してください')));
+      return;
     }
-  }
-
-  Future<void> _testAWSBedrock() async {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const VoiceConversationScreen()),
+    final alarm = Alarm(
+      id: widget.alarm?.id ?? const Uuid().v4(),
+      time: _selectedTime,
+      label: _labelController.text.trim().isEmpty
+          ? 'アラーム'
+          : _labelController.text.trim(),
+      isRepeating: _isRepeating,
+      weekdays: _isRepeating ? _selectedWeekdays : List.filled(7, false),
+      isActive: true,
     );
+    Navigator.pop(context, alarm);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -123,14 +97,10 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 時間選択カード
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: InkWell(
                 onTap: _selectTime,
                 borderRadius: BorderRadius.circular(16),
@@ -138,145 +108,44 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
                   padding: const EdgeInsets.all(24),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.access_time,
-                          color: Colors.blue[700],
-                          size: 24,
-                        ),
-                      ),
+                      const Icon(Icons.access_time, color: Colors.blue, size: 28),
                       const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '時間',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
-                              style: theme.textTheme.headlineSmall?.copyWith(
-                                color: Colors.blue[700],
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.grey[400],
-                        size: 16,
+                      Text(
+                        '${_selectedTime.hour.toString().padLeft(2, '0')}:${_selectedTime.minute.toString().padLeft(2, '0')}',
+                        style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.w600),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // ラベル入力カード
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.label_outline,
-                            color: Colors.green[700],
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Text(
-                          'ラベル',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _labelController,
-                      decoration: InputDecoration(
-                        hintText: 'アラームの名前を入力',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        filled: true,
-                        fillColor: Colors.grey[100],
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ],
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+                child: TextField(
+                  controller: _labelController,
+                  decoration: const InputDecoration(
+                    labelText: 'ラベル',
+                    border: InputBorder.none,
+                  ),
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // 繰り返し設定カード
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.repeat,
-                            color: Colors.orange[700],
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Text(
-                            '繰り返し',
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
+                        const Text('繰り返し', style: TextStyle(fontSize: 16)),
                         Switch(
                           value: _isRepeating,
                           onChanged: (value) {
@@ -287,84 +156,44 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
                         ),
                       ],
                     ),
-
                     if (_isRepeating) ...[
-                      const SizedBox(height: 20),
-                      Text(
-                        '繰り返す曜日',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
+                      const Divider(height: 24),
                       _buildWeekdaySelector(),
                     ],
                   ],
                 ),
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // AWSテストボタンカード
             Card(
               elevation: 2,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: InkWell(
-                onTap: _testAWSBedrock,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const VoiceConversationScreen()),
+                  );
+                },
                 borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
+                child: const Padding(
+                  padding: EdgeInsets.all(20),
                   child: Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          Icons.cloud,
-                          color: Colors.purple[700],
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
+                      Icon(Icons.cloud, color: Colors.purple),
+                      SizedBox(width: 16),
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'AWS音声会話テスト',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '🎙️ 音声で話しかけて、AI音声で返答を聞けます\n📍 現在地の天気情報も取得できます',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          'AWS音声会話テスト',
+                          style: TextStyle(fontSize: 16),
                         ),
                       ),
-                      Icon(
-                        Icons.arrow_forward_ios,
-                        color: Colors.grey[400],
-                        size: 16,
-                      ),
+                      Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
                     ],
                   ),
                 ),
               ),
             ),
-
-            const SizedBox(height: 40),
           ],
         ),
       ),
@@ -373,38 +202,19 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
 
   Widget _buildWeekdaySelector() {
     final weekdayNames = ['月', '火', '水', '木', '金', '土', '日'];
-
     return Wrap(
       spacing: 8,
       runSpacing: 8,
+      alignment: WrapAlignment.center,
       children: List.generate(7, (index) {
-        final isSelected = _selectedWeekdays[index];
-        final isWeekend = index >= 5; // 土日
-
         return FilterChip(
-          label: Text(
-            weekdayNames[index],
-            style: TextStyle(
-              color: isSelected
-                  ? Colors.white
-                  : isWeekend
-                  ? Colors.red[600]
-                  : Colors.grey[700],
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          selected: isSelected,
+          label: Text(weekdayNames[index]),
+          selected: _selectedWeekdays[index],
           onSelected: (selected) {
             setState(() {
               _selectedWeekdays[index] = selected;
             });
           },
-          selectedColor: isWeekend ? Colors.red[400] : Colors.blue[500],
-          checkmarkColor: Colors.white,
-          backgroundColor: Colors.grey[100],
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
         );
       }),
     );

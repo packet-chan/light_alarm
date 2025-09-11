@@ -5,7 +5,6 @@ import 'package:flutter/foundation.dart';
 import '../config/api_config.dart';
 
 class BedrockService {
-  // API Gateway エンドポイントを設定ファイルから取得
   static String get _voiceApiEndpoint => ApiConfig.voiceApiEndpoint;
 
   Future<String> startMorningConversation() async {
@@ -42,7 +41,6 @@ class BedrockService {
     } catch (e) {
       print('Error calling API Gateway: $e');
 
-      // Web環境でもフォールバック用の自然な応答を提供
       final now = DateTime.now();
       final hour = now.hour;
       final minute = now.minute;
@@ -64,7 +62,6 @@ class BedrockService {
     }
   }
 
-  // 音声処理用メソッドも同様に更新
   Future<Map<String, dynamic>> processVoiceMessage(
     String text,
     double latitude,
@@ -103,7 +100,6 @@ class BedrockService {
     } catch (e) {
       print('Error processing voice message via API Gateway: $e');
 
-      // Web環境でもフォールバック用の自然な応答を提供
       String fallbackResponse;
 
       if (text.contains('天気') ||
@@ -138,7 +134,6 @@ class BedrockService {
     }
   }
 
-  // 天気情報取得メソッドも同様に更新
   Future<Map<String, dynamic>> getWeatherInfo(
     double latitude,
     double longitude,
@@ -165,7 +160,6 @@ class BedrockService {
     } catch (e) {
       print('Error getting weather info via API Gateway: $e');
 
-      // Web環境でもフォールバック応答を提供
       return {
         'weather_info': '申し訳ございません。現在天気情報を取得できません。お出かけの際は、念のため天気予報をご確認ください。',
       };

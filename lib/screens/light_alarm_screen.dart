@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:light/light.dart';
 import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
+import 'voice_conversation_screen.dart';
 
 class AlarmScreen extends StatefulWidget {
   const AlarmScreen({super.key});
@@ -95,7 +96,7 @@ class _AlarmScreenState extends State<AlarmScreen>
   void _stopAlarm() {
     setState(() {
       _isAlarmPlaying = false;
-      _statusText = "おはようございます！アラームは停止しました。";
+      _statusText = "おはようございます！\n音声アシスタントと会話を始めます...";
     });
 
     _pulseController.stop();
@@ -103,10 +104,14 @@ class _AlarmScreenState extends State<AlarmScreen>
     _pulseTimer?.cancel();
     _ringtonePlayer.stop();
 
-    // 3秒後に自動で画面を閉じる
-    Timer(const Duration(seconds: 3), () {
+    Timer(const Duration(seconds: 2), () {
       if (mounted) {
-        Navigator.pop(context);
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const VoiceConversationScreen(),
+          ),
+        );
       }
     });
   }
@@ -181,7 +186,6 @@ class _AlarmScreenState extends State<AlarmScreen>
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
     final isAlarmActive = _isAlarmPlaying;
 
     return Scaffold(
@@ -199,7 +203,6 @@ class _AlarmScreenState extends State<AlarmScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // ヘッダー部分
               Container(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -224,14 +227,12 @@ class _AlarmScreenState extends State<AlarmScreen>
                 ),
               ),
 
-              // メイン表示エリア
               Expanded(
-                child: Container(
+                child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 30),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // アニメーション付きアイコン
                       AnimatedBuilder(
                         animation: _pulseAnimation,
                         builder: (context, child) {
@@ -277,7 +278,6 @@ class _AlarmScreenState extends State<AlarmScreen>
 
                       const SizedBox(height: 30),
 
-                      // ステータステキスト
                       Text(
                         _statusText,
                         textAlign: TextAlign.center,
@@ -291,7 +291,6 @@ class _AlarmScreenState extends State<AlarmScreen>
 
                       const SizedBox(height: 40),
 
-                      // 光センサー情報
                       Container(
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
@@ -353,9 +352,8 @@ class _AlarmScreenState extends State<AlarmScreen>
                 ),
               ),
 
-              // ボタンエリア
               if (isAlarmActive)
-                Container(
+                Padding(
                   padding: const EdgeInsets.all(30),
                   child: Row(
                     children: [

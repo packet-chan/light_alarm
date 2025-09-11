@@ -68,14 +68,8 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
   Future<void> _scheduleAlarm(Alarm alarm) async {
     final success = await AlarmService.scheduleAlarm(alarm);
     if (!success) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('アラームの設定に失敗しました'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      // ユーザーへの通知はしない（ハッカソン仕様）
+      print('アラームの設定に失敗しました');
     }
   }
 
@@ -172,85 +166,19 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
   // 隠しコマンド: ヘッダーを3回タップで光アラーム画面に遷移
   void _onHeaderTap() {
     _headerTapCount++;
-
-    // 前のタイマーをキャンセル
     _tapResetTimer?.cancel();
 
     if (_headerTapCount >= 3) {
-      // 3回タップで光アラーム画面に遷移
       _headerTapCount = 0;
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => const AlarmScreen()),
       );
     } else {
-      // 2秒後にカウントをリセット
       _tapResetTimer = Timer(const Duration(seconds: 2), () {
         _headerTapCount = 0;
       });
     }
-  }
-
-  // デバッグ画面を表示
-  void _showDebugScreen() async {
-    final logs = await AlarmService.getDebugLogs();
-    final scheduledAlarms = await AlarmService.getScheduledAlarms();
-
-    if (!mounted) return;
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('デバッグ情報'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 400,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'スケジュール済みアラーム: ${scheduledAlarms.length}個',
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              ...scheduledAlarms.map(
-                (alarm) => Text(
-                  '${alarm['label']}: ${alarm['scheduledTime']}',
-                  style: const TextStyle(fontSize: 12),
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text('ログ:', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: logs.length,
-                  itemBuilder: (context, index) {
-                    return Text(
-                      logs[logs.length - 1 - index],
-                      style: const TextStyle(fontSize: 10),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              await AlarmService.clearDebugLogs();
-              Navigator.pop(context);
-            },
-            child: const Text('ログクリア'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('閉じる'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -269,13 +197,6 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
         foregroundColor: Colors.black87,
         elevation: 0,
         centerTitle: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: _showDebugScreen,
-            tooltip: 'デバッグ情報',
-          ),
-        ],
       ),
       body: _alarms.isEmpty
           ? _buildEmptyState()

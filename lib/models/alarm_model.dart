@@ -55,15 +55,16 @@ class Alarm {
       time.minute,
     );
 
-    if (!isRepeating) {
-      // 一度きりのアラーム
+    if (!isRepeating || weekdays.every((d) => !d)) {
+      // 繰り返しがオフ、または曜日が一つも選択されていない場合
       return today.isAfter(now) ? today : today.add(const Duration(days: 1));
     }
 
     // 繰り返しアラームの場合
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < 8; i++) {
       final checkDate = now.add(Duration(days: i));
-      final weekdayIndex = (checkDate.weekday - 1) % 7; // 月曜日を0に調整
+      // DateTime.weekdayは 月曜日:1, ..., 日曜日:7
+      final weekdayIndex = checkDate.weekday - 1; // 0:月, ..., 6:日
 
       if (weekdays[weekdayIndex]) {
         final alarmTime = DateTime(
@@ -84,7 +85,7 @@ class Alarm {
 
   // 選択された曜日の文字列表現を取得
   String getWeekdaysString() {
-    if (!isRepeating) return '一回のみ';
+    if (!isRepeating || weekdays.every((d) => !d)) return '一回のみ';
 
     final weekdayNames = ['月', '火', '水', '木', '金', '土', '日'];
     final selectedDays = <String>[];
@@ -95,8 +96,10 @@ class Alarm {
       }
     }
 
-    if (selectedDays.isEmpty) return '設定なし';
+    if (selectedDays.isEmpty) return '一回のみ';
     if (selectedDays.length == 7) return '毎日';
+    if (selectedDays.length == 2 && selectedDays.contains('土') && selectedDays.contains('日')) return '週末';
+    if (selectedDays.length == 5 && !selectedDays.contains('土') && !selectedDays.contains('日')) return '平日';
 
     return selectedDays.join(', ');
   }
