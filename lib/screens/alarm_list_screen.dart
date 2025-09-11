@@ -91,6 +91,9 @@ class _AlarmListScreenState extends State<AlarmListScreen> {
     if (isAlarmTriggered) {
       await prefs.setBool('alarm_triggered', false);
 
+      // 通知をキャンセル
+      await AlarmService.cancelAlarmNotification();
+
       if (mounted) {
         Navigator.push(
           context,

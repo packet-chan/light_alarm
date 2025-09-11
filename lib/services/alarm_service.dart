@@ -1,14 +1,48 @@
-// lib/services/alarm_service.dart
+// lib/services/alarm_service.dart (更新版)
 
 import 'dart:convert';
 import 'dart:isolate';
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:light_alarm_prototype/models/alarm_model.dart';
+import 'package:flutter/services.dart';
 
 class AlarmService {
   static const String _alarmsKey = 'alarms';
   static const String _debugLogKey = 'debug_log';
+  static const MethodChannel _channel = MethodChannel('alarm_service');
+
+  // アプリを前面に持ってくるためのネイティブメソッド
+  static Future<void> bringAppToForeground() async {
+    try {
+      await _channel.invokeMethod('bringToForeground');
+    } catch (e) {
+      await addDebugLog('アプリ前面表示エラー: $e');
+    }
+  }
+
+  // 通知を表示
+  static Future<void> showAlarmNotification(String title, String body) async {
+    try {
+      await _channel.invokeMethod('showNotification', {
+        'title': title,
+        'body': body,
+        'autoCancel': false,
+        'ongoing': true,
+      });
+    } catch (e) {
+      await addDebugLog('通知表示エラー: $e');
+    }
+  }
+
+  // 通知をキャンセル
+  static Future<void> cancelAlarmNotification() async {
+    try {
+      await _channel.invokeMethod('cancelNotification');
+    } catch (e) {
+      await addDebugLog('通知キャンセルエラー: $e');
+    }
+  }
 
   // デバッグ用のログを追加
   static Future<void> addDebugLog(String message) async {
@@ -37,7 +71,7 @@ class AlarmService {
     await prefs.remove(_debugLogKey);
   }
 
-  // アラームをスケジュールする（改良版）
+  // アラームをスケジュールする
   static Future<bool> scheduleAlarm(Alarm alarm) async {
     if (!alarm.isActive) {
       await addDebugLog('アラーム ${alarm.id} は非アクティブのためスケジュールをスキップ');
@@ -64,10 +98,11 @@ class AlarmService {
       final success = await AndroidAlarmManager.oneShotAt(
         nextTime,
         alarmId,
-        _alarmCallback,
+        alarmCallback,
         exact: true,
         wakeup: true,
         rescheduleOnReboot: true,
+        allowWhileIdle: true, // 追加: Doze modeでも実行
       );
 
       if (success) {
@@ -106,9 +141,8 @@ class AlarmService {
 
   // より安全なID生成
   static int _generateAlarmId(String alarmId) {
-    // アラームIDの後ろ8文字を使用し、安全な範囲に収める
     final hashCode = alarmId.hashCode.abs();
-    return (hashCode % 2000000000) + 1000000000; // 10億から29億の範囲
+    return (hashCode % 2000000000) + 1000000000;
   }
 
   // スケジュールされたアラーム情報を保存
@@ -157,7 +191,7 @@ class AlarmService {
 
 // アラームコールバック関数（isolateで実行される）
 @pragma('vm:entry-point')
-void _alarmCallback(int alarmId) async {
+void alarmCallback(int alarmId) async {
   print('[AlarmCallback] アラームコールバック実行: ID $alarmId, 時刻: ${DateTime.now()}');
 
   try {
@@ -168,20 +202,40 @@ void _alarmCallback(int alarmId) async {
     logs.add('${DateTime.now().toIso8601String()}: アラームコールバック実行 ID:$alarmId');
     await prefs.setStringList('debug_log', logs);
 
-    // 「置き手紙」を残す
-    await prefs.setBool('alarm_triggered', true);
-    await prefs.setString('triggered_alarm_id', alarmId.toString());
-
-    print('[AlarmCallback] 置き手紙を設定完了');
-
-    // スケジュール情報を取得
+    // アラーム情報を取得
+    String alarmLabel = 'アラーム';
     final scheduledInfo = prefs.getString('scheduled_$alarmId');
     if (scheduledInfo != null) {
       final info = jsonDecode(scheduledInfo);
+      alarmLabel = info['label'] ?? 'アラーム';
       print(
-        '[AlarmCallback] 実行されたアラーム: ${info['label']} (${info['scheduledTime']})',
+        '[AlarmCallback] 実行されたアラーム: $alarmLabel (${info['scheduledTime']})',
       );
     }
+
+    // 「置き手紙」を残す
+    await prefs.setBool('alarm_triggered', true);
+    await prefs.setString('triggered_alarm_id', alarmId.toString());
+    await prefs.setString('triggered_alarm_label', alarmLabel);
+
+    // アプリを前面に持ってくる + 通知を表示
+    try {
+      // MethodChannelを使ってネイティブ側でアプリを起動
+      const MethodChannel(
+        'alarm_service',
+      ).invokeMethod('launchAlarm', {'alarmId': alarmId, 'label': alarmLabel});
+    } catch (e) {
+      print('[AlarmCallback] アプリ起動エラー: $e');
+      // フォールバック: 通知のみ表示
+      const MethodChannel('alarm_service').invokeMethod('showNotification', {
+        'title': 'アラーム: $alarmLabel',
+        'body': 'タップしてアラームを停止してください',
+        'autoCancel': false,
+        'ongoing': true,
+      });
+    }
+
+    print('[AlarmCallback] 置き手紙を設定完了');
   } catch (e) {
     print('[AlarmCallback] エラー: $e');
   }
