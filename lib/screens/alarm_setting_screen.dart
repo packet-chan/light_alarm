@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:light_alarm_prototype/models/alarm_model.dart';
-import 'package:light_alarm_prototype/services/alarm_service.dart';
+import 'voice_conversation_screen.dart';
 
 class AlarmSettingScreen extends StatefulWidget {
   final Alarm? alarm; // 既存のアラームを編集する場合
@@ -90,6 +90,13 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
         context,
       ).showSnackBar(const SnackBar(content: Text('繰り返しアラームの場合は曜日を選択してください')));
     }
+  }
+
+  Future<void> _testAWSBedrock() async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const VoiceConversationScreen()),
+    );
   }
 
   @override
@@ -294,6 +301,65 @@ class _AlarmSettingScreenState extends State<AlarmSettingScreen> {
                       _buildWeekdaySelector(),
                     ],
                   ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // AWSテストボタンカード
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: InkWell(
+                onTap: _testAWSBedrock,
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.cloud,
+                          color: Colors.purple[700],
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'AWS音声会話テスト',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '🎙️ 音声で話しかけて、AI音声で返答を聞けます\n📍 現在地の天気情報も取得できます',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios,
+                        color: Colors.grey[400],
+                        size: 16,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

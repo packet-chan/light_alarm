@@ -45,5 +45,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- 音声認識とマイクの権限設定 -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>このアプリは音声でのやり取りを行うためにマイクへのアクセスが必要です。</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>このアプリは音声認識機能を使用してあなたの音声を文字に変換します。</string>
+	<!-- 位置情報の権限設定 -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>このアプリは天気情報を取得するために位置情報が必要です。</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>このアプリは天気情報を取得するために位置情報が必要です。</string>
 </dict>
 </plist>
